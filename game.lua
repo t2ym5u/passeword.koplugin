@@ -16,6 +16,8 @@
 -- With `swap` on, rounds 3-4 mix the teams (1 with 4, 3 with 2) and the
 -- ranking is individual: the two best players play the final.
 
+local SeenHistory = require("seen_history")
+
 local Game = {}
 Game.__index = Game
 
@@ -71,12 +73,13 @@ function Game.formatPrize(n, unit, lang)
 end
 
 -- opts: players (4 names), swap (bool), bank ({ [difficulty] = { words } }),
--- recent (set of words to avoid), rng (function(n) -> 1..n).
+-- seen (a SeenHistory remembering the words dealt in earlier games; an
+-- in-memory one when nil), rng (function(n) -> 1..n).
 function Game.new(opts)
     local self = setmetatable({}, Game)
     self.rng = opts.rng or math.random
     self.bank = opts.bank or {}
-    self.recent = opts.recent or {}
+    self.seen = opts.seen or SeenHistory.open(nil, "words")
     self.swap = opts.swap and true or false
     self.players = {}
     for i = 1, 4 do self.players[i] = (opts.players or {})[i] or ("Player " .. i) end
@@ -102,30 +105,39 @@ end
 -- ---------------------------------------------------------------------------
 
 -- n distinct words of the given difficulties, never twice in a game; words
--- in self.recent (seen in recent games) only once the fresh ones run out.
+-- dealt in earlier games (self.seen) only once every word of these
+-- difficulties has been dealt.
 function Game:draw(difficulties, n)
-    local fresh, stale = {}, {}
+    local pool = {}
     for _, d in ipairs(difficulties) do
         for _, w in ipairs(self.bank[d] or {}) do
-            if not self.used[w] then
-                if self.recent[w] then stale[#stale + 1] = w else fresh[#fresh + 1] = w end
-            end
+            if not self.used[w] then pool[#pool + 1] = w end
         end
     end
-    shuffle(fresh, self.rng)
-    shuffle(stale, self.rng)
-    local out = {}
-    for _, list in ipairs({ fresh, stale }) do
-        for _, w in ipairs(list) do
-            if #out >= n then break end
-            out[#out + 1] = w
-        end
-    end
+    local out = self.seen:draw(pool, n, self.rng)
     for _, w in ipairs(out) do
         self.used[w] = true
         self.used_list[#self.used_list + 1] = w
     end
     return out
+end
+
+-- The 1.0.x "recent_words" list (newest first, languages mixed) into the
+-- per-language histories: banks = { fr = bank, en = bank }, seenFor(lang)
+-- -> SeenHistory. Words are marked oldest first, so the history keeps their
+-- order.
+function Game.migrateRecent(list, banks, seenFor)
+    for lang, bank in pairs(banks) do
+        local in_bank = {}
+        for _, words in pairs(bank) do
+            for _, w in ipairs(words) do in_bank[w] = true end
+        end
+        local items = {}
+        for i = #list, 1, -1 do
+            if in_bank[list[i]] then items[#items + 1] = list[i] end
+        end
+        if #items > 0 then seenFor(lang):mark(items) end
+    end
 end
 
 -- ---------------------------------------------------------------------------

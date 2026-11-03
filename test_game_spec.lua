@@ -1,5 +1,5 @@
 local DIR = debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "./"
-package.path = DIR .. "?.lua;" .. package.path
+package.path = DIR .. "?.lua;" .. DIR .. "common/?.lua;" .. package.path
 
 local Game = dofile(DIR .. "game.lua")
 
@@ -21,10 +21,22 @@ local function fakeBank()
     return bank
 end
 
+local SeenHistory = require("seen_history")
+
 local function newGame(opts)
     opts = opts or {}
     return Game.new{ players = { "Alice", "Bob", "Carol", "Dave" }, swap = opts.swap,
-                     bank = fakeBank(), rng = lcg(opts.seed or 1) }
+                     bank = opts.bank or fakeBank(), rng = lcg(opts.seed or 1), seen = opts.seen }
+end
+
+-- Plugin settings stand-in, kept between "sessions".
+local function fakePlugin()
+    local store = {}
+    return {
+        store = store,
+        getSetting  = function(_self, k, d) if store[k] == nil then return d end return store[k] end,
+        saveSetting = function(_self, k, v) store[k] = v end,
+    }
 end
 
 local function difficulty(w) return tonumber(w:match("^d(%d)")) end
@@ -432,3 +444,39 @@ for _, lang in ipairs({ "fr", "en" }) do
         end)
     end)
 end
+
+describe("passeword history across games", function()
+    it("never deals a word of an earlier session until its level is used up", function()
+        local p = fakePlugin()
+        local seen_words = {}
+        -- 60 words in level 3: three games of 20 never share a word
+        for session = 1, 3 do
+            local g = newGame{ seed = session, seen = SeenHistory.open(p, "words_fr", { max = 2000 }) }
+            local words = g:draw({ 3 }, 20)
+            assert.are.equal(20, #words)
+            for _, w in ipairs(words) do
+                assert.is_nil(seen_words[w], "session " .. session .. " repeated " .. w)
+                seen_words[w] = true
+            end
+        end
+        -- level 3 (60 words) is now used up: a new cycle, still 20 distinct words
+        local g = newGame{ seed = 9, seen = SeenHistory.open(p, "words_fr", { max = 2000 }) }
+        local again = g:draw({ 3 }, 20)
+        assert.are.equal(20, #again)
+    end)
+
+    it("migrates the 1.0.x recent_words list into each language once", function()
+        local p = fakePlugin()
+        local banks = { fr = { { "chat", "chien" }, { "maison" } }, en = { { "cat", "dog" } } }
+        -- newest first, languages mixed, plus a word no longer in any bank
+        local old = { "dog", "chien", "gone", "chat", "cat" }
+        Game.migrateRecent(old, banks, function(lang)
+            return SeenHistory.open(p, "words_" .. lang, { max = 2000 })
+        end)
+        assert.are.same({ "chat", "chien" }, p.store.seen_words_fr)
+        assert.are.same({ "cat", "dog" }, p.store.seen_words_en)
+        -- a game opened afterwards avoids them
+        local g = newGame{ bank = banks.fr, seen = SeenHistory.open(p, "words_fr", { max = 2000 }) }
+        assert.are.same({ "maison" }, g:draw({ 1, 2 }, 1))
+    end)
+end)

@@ -27,12 +27,14 @@ local T               = require("ffi/util").template
 
 local MenuHelper = require("menu_helper")
 local ScreenBase = require("screen_base")
+local SeenHistory = require("seen_history")
 local Game       = lrequire("game")
 local W          = lrequire("widgets")
 
 local DeviceScreen = Device.screen
 
-local MAX_RECENT = 400
+-- Words remembered across games, per language (the whole bank, ~1700).
+local SEEN_MAX = 2000
 
 local GAME_RULES_EN = [[
 Pass the Word — Rules
@@ -135,13 +137,12 @@ function PassewordScreen:init()
     local plugin = self.plugin
     self.lang = plugin:getSetting("lang", defaultLang())
     self.unit = plugin:getSetting("unit", "euros")
-    local recent = {}
-    for _i, w in ipairs(plugin:getSetting("recent_words", {})) do recent[w] = true end
+    self:_migrateRecent()
     self.game = Game.new{
         players = self:_savedPlayers(),
         swap = plugin:getSetting("swap", false),
         bank = loadBank(self.lang),
-        recent = recent,
+        seen = self:_seen(self.lang),
     }
     self.game:load(plugin:loadState())
     ScreenBase.init(self)
@@ -252,17 +253,24 @@ end
 -- Actions: qualification
 -- ---------------------------------------------------------------------------
 
-function PassewordScreen:_rememberWords()
-    local list = {}
-    for i = #self.game.used_list, 1, -1 do list[#list + 1] = self.game.used_list[i] end
-    for _i, w in ipairs(self.plugin:getSetting("recent_words", {})) do
-        if #list >= MAX_RECENT then break end
-        if not self.game.used[w] then list[#list + 1] = w end
+-- The words dealt, remembered in the settings ("seen_words_<lang>") as they
+-- are dealt: a word comes back only once its whole difficulty level has been
+-- played, whatever the number of games in between.
+function PassewordScreen:_seen(lang)
+    return SeenHistory.open(self.plugin, "words_" .. lang, { max = SEEN_MAX })
+end
+
+-- Up to 1.0.x the last 400 words of finished games were kept under
+-- "recent_words" (newest first, both languages mixed): move them into each
+-- language's history once, then drop the old setting.
+function PassewordScreen:_migrateRecent()
+    local old = self.plugin:getSetting("recent_words", nil)
+    if old == nil then return end
+    if type(old) == "table" then
+        Game.migrateRecent(old, { fr = loadBank("fr"), en = loadBank("en") },
+            function(lang) return self:_seen(lang) end)
     end
-    self.plugin:saveSetting("recent_words", list)
-    local set = {}
-    for _i, w in ipairs(list) do set[w] = true end
-    self.game.recent = set
+    self.plugin:saveSetting("recent_words", nil)
 end
 
 function PassewordScreen:onStartGame()
@@ -445,7 +453,6 @@ end
 function PassewordScreen:onNewGame()
     self:_stopCountdown()
     self.joker_words = nil
-    self:_rememberWords()
     self.game.swap = self.plugin:getSetting("swap", false)
     self.game:newGame()
     self:_save()
@@ -453,7 +460,6 @@ function PassewordScreen:onNewGame()
 end
 
 function PassewordScreen:onFinalAgain()
-    self:_rememberWords()
     self.game:restartFinal()
     self:_save()
     self:_redraw()
@@ -480,6 +486,7 @@ function PassewordScreen:openLangMenu()
             self.lang = lang
             self.plugin:saveSetting("lang", lang)
             self.game.bank = loadBank(lang)
+            self.game.seen = self:_seen(lang)
         end)
 end
 
