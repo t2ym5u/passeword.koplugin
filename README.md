@@ -58,7 +58,8 @@ then a final with a prize pyramid).
 - Word banks written natively in French and English, tagged by difficulty;
   the qualification draws difficulties 1–2 (rounds 1–2) and 2–3 (rounds 3–4),
   the tie-break 2–3, final level *n* difficulty *n*. No word comes back twice
-  in a game, and the words of the last games are avoided:
+  in a game, and a word dealt in an earlier game only comes back once its
+  whole difficulty level has been played:
 
   | Difficulty | EN | FR |
   |------------|----|----|

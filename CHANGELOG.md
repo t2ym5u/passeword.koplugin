@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-11-03
+
+### Changed
+- Words are remembered across games until the whole difficulty level has
+  been played (the whole bank, instead of the last 400 words), and as soon as
+  they are dealt rather than at the end of a game. The words already
+  remembered are carried over.
+
 ## [1.0.2] - 2026-11-02
 
 ### Changed
