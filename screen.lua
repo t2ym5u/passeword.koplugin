@@ -114,10 +114,6 @@ PERMIS
 Changer de partenaire aux manches 3–4 (réglage) : les équipes sont mélangées aux manches 3 et 4 (joueur 1 avec joueur 4, joueur 3 avec joueur 2) et le classement devient individuel ; les deux meilleurs joueurs jouent la finale.
 ]]
 
-local function defaultLang()
-    return _.lang() == "fr" and "fr" or "en"
-end
-
 -- One file per language, loaded only when that language is played.
 local function loadBank(lang)
     local chunk = loadfile(_dir .. "words/" .. lang .. ".lua")
@@ -135,7 +131,7 @@ local PassewordScreen = ScreenBase:extend{}
 
 function PassewordScreen:init()
     local plugin = self.plugin
-    self.lang = plugin:getSetting("lang", defaultLang())
+    self.lang = plugin:getLang({ "fr", "en" })
     self.unit = plugin:getSetting("unit", "euros")
     self:_migrateRecent()
     self.game = Game.new{
@@ -484,7 +480,7 @@ function PassewordScreen:openLangMenu()
         { { id = "fr", text = "Français" }, { id = "en", text = "English" } }, self.lang,
         function(lang)
             self.lang = lang
-            self.plugin:saveSetting("lang", lang)
+            self.plugin:setLang(lang)
             self.game.bank = loadBank(lang)
             self.game.seen = self:_seen(lang)
         end)
@@ -538,8 +534,8 @@ end
 -- Renames in place (scores kept); missing lines keep the old name.
 function PassewordScreen:applyPlayerNames(text)
     local names = {}
-    for line in (text .. "\n"):gmatch("(.-)\n") do
-        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+    for raw in (text .. "\n"):gmatch("(.-)\n") do
+        local line = raw:gsub("^%s+", ""):gsub("%s+$", "")
         if line ~= "" then names[#names + 1] = line end
     end
     for i = 1, 4 do
