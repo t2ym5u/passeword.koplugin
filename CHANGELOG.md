@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2026-11-10
+
+### Added
+- Twice as many French words: 3,378 (was 1,687), on all five levels. The
+  game remembers the last 4,000 words it dealt (was 2,000), so it goes
+  through the whole bank before repeating one.
+
 ## [1.1.3] - 2026-11-09
 
 ### Fixed

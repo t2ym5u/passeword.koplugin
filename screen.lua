@@ -33,8 +33,8 @@ local W          = lrequire("widgets")
 
 local DeviceScreen = Device.screen
 
--- Words remembered across games, per language (the whole bank, ~1700).
-local SEEN_MAX = 2000
+-- Words remembered across games, per language (the whole bank: ~3400 in French).
+local SEEN_MAX = 4000
 
 local GAME_RULES_EN = [[
 Pass the Word — Rules
