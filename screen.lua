@@ -185,7 +185,7 @@ function PassewordScreen:_startCountdown(seconds)
     self.time_left = seconds
     self._tick_gen = (self._tick_gen or 0) + 1
     local gen = self._tick_gen
-    UIManager:scheduleIn(1, function() self:_onTick(gen) end)
+    self:schedule(1, function() self:_onTick(gen) end)
 end
 
 function PassewordScreen:_stopCountdown()
@@ -225,7 +225,7 @@ function PassewordScreen:_onTick(gen)
         self:_refreshBanner()
     end
     self:_refreshTimer()
-    UIManager:scheduleIn(1, function() self:_onTick(gen) end)
+    self:schedule(1, function() self:_onTick(gen) end)
 end
 
 -- The tie-break banner shows whose turn it is; swapping it is the visual "beep".
@@ -432,7 +432,7 @@ end
 function PassewordScreen:_scheduleJoker()
     self._tick_gen = (self._tick_gen or 0) + 1
     local gen = self._tick_gen
-    UIManager:scheduleIn(Game.JOKER_TIME, function() self:_onJokerTick(gen) end)
+    self:schedule(Game.JOKER_TIME, function() self:_onJokerTick(gen) end)
 end
 
 function PassewordScreen:_onJokerTick(gen)
@@ -447,6 +447,7 @@ function PassewordScreen:_onJokerTick(gen)
 end
 
 function PassewordScreen:onNewGame()
+    self:cancelScheduled()
     self:_stopCountdown()
     self.joker_words = nil
     self.game.swap = self.plugin:getSetting("swap", false)
@@ -456,6 +457,7 @@ function PassewordScreen:onNewGame()
 end
 
 function PassewordScreen:onFinalAgain()
+    self:cancelScheduled()
     self.game:restartFinal()
     self:_save()
     self:_redraw()
